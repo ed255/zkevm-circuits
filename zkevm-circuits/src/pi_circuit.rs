@@ -1466,6 +1466,31 @@ impl<F: Field, const MAX_TXS: usize, const MAX_CALLDATA: usize>
 }
 
 #[cfg(any(feature = "test", test, feature = "test-circuits"))]
+impl<F: Field, const MAX_TXS: usize, const MAX_CALLDATA: usize> SubCircuit<F>
+    for PiTestCircuit<F, MAX_TXS, MAX_CALLDATA>
+{
+    type Config = PiCircuitConfig<F>;
+
+    fn new_from_block(block: &witness::Block<F>) -> Self {
+        Self(PiCircuit::new_from_block(block))
+    }
+    fn instance(&self) -> Vec<Vec<F>> {
+        self.0.instance()
+    }
+    fn min_num_rows_block(block: &witness::Block<F>) -> (usize, usize) {
+        PiCircuit::min_num_rows_block(block)
+    }
+    fn synthesize_sub(
+        &self,
+        config: &Self::Config,
+        challenges: &Challenges<Value<F>>,
+        layouter: &mut impl Layouter<F>,
+    ) -> Result<(), Error> {
+        self.0.synthesize_sub(config, challenges, layouter)
+    }
+}
+
+#[cfg(any(feature = "test", test))]
 impl<F: Field, const MAX_TXS: usize, const MAX_CALLDATA: usize> Circuit<F>
     for PiTestCircuit<F, MAX_TXS, MAX_CALLDATA>
 {

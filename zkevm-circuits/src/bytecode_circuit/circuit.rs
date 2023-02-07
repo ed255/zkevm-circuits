@@ -447,7 +447,6 @@ impl<F: Field> BytecodeCircuitConfig<F> {
             |mut region| {
                 // annotate columns
                 self.annotate_circuit(&mut region);
-
                 let mut offset = 0;
                 for bytecode in witness.iter() {
                     self.assign_bytecode(
