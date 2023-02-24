@@ -107,11 +107,14 @@ pub(crate) const N_BYTES_CALLDATASIZE: usize = N_BYTES_U64;
 
 lazy_static::lazy_static! {
     // Step slot height in evm circuit
-    pub(crate) static ref EXECUTION_STATE_HEIGHT_MAP : HashMap<ExecutionState, usize> = get_step_height_map();
+    pub(crate) static ref EXECUTION_STATE_HEIGHT_MAP : HashMap<ExecutionState, usize> = {
+        let circuit = EvmCircuit::<Fr>::default();
+        get_step_height_map(&circuit)
+    };
 }
-fn get_step_height_map() -> HashMap<ExecutionState, usize> {
+fn get_step_height_map(circuit: &EvmCircuit<Fr>) -> HashMap<ExecutionState, usize> {
     let mut meta = ConstraintSystem::<Fr>::default();
-    let circuit = EvmCircuit::configure(&mut meta);
+    let circuit = circuit.configure(&mut meta);
 
     circuit.0.execution.height_map
 }

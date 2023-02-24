@@ -813,7 +813,7 @@ impl<F: Field> Circuit<F> for BytecodeCircuit<F> {
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         let bytecode_table = BytecodeTable::construct(meta);
         let keccak_table = KeccakTable::construct(meta);
         let challenges = Challenges::construct(meta);

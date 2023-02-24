@@ -394,7 +394,7 @@ impl<F: Field> Circuit<F> for TxCircuit<F> {
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         let tx_table = TxTable::construct(meta);
         let keccak_table = KeccakTable::construct(meta);
         let challenges = Challenges::construct(meta);

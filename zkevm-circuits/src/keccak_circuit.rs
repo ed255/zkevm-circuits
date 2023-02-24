@@ -1000,7 +1000,7 @@ impl<F: Field> Circuit<F> for KeccakCircuit<F> {
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         let keccak_table = KeccakTable::construct(meta);
         let challenges = Challenges::construct(meta);
 

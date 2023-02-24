@@ -301,7 +301,8 @@ pub(crate) mod cached {
         /// Circuit configuration.  These values are calculated just once.
         static ref CACHE: Cache = {
             let mut meta = ConstraintSystem::<Fr>::default();
-            let config = EvmCircuit::<Fr>::configure(&mut meta);
+            let circuit = EvmCircuit::<Fr>::default();
+            let config = circuit.configure(&mut meta);
             Cache { cs: meta, config }
         };
     }
@@ -321,7 +322,7 @@ pub(crate) mod cached {
             Self(self.0.without_witnesses())
         }
 
-        fn configure(meta: &mut ConstraintSystem<Fr>) -> Self::Config {
+        fn configure(&self, meta: &mut ConstraintSystem<Fr>) -> Self::Config {
             *meta = CACHE.cs.clone();
             CACHE.config.clone()
         }
@@ -351,7 +352,7 @@ impl<F: Field> Circuit<F> for EvmCircuit<F> {
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         let tx_table = TxTable::construct(meta);
         let rw_table = RwTable::construct(meta);
         let bytecode_table = BytecodeTable::construct(meta);

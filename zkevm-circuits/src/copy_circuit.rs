@@ -796,7 +796,7 @@ impl<F: Field> Circuit<F> for CopyCircuit<F> {
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         let tx_table = TxTable::construct(meta);
         let rw_table = RwTable::construct(meta);
         let bytecode_table = BytecodeTable::construct(meta);

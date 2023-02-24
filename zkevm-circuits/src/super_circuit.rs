@@ -359,7 +359,7 @@ impl<F: Field, const MAX_TXS: usize, const MAX_CALLDATA: usize, const MOCK_RANDO
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         Self::Config::new(
             meta,
             SuperCircuitConfigArgs {

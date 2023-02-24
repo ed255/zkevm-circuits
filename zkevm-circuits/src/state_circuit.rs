@@ -535,7 +535,7 @@ where
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         let rw_table = RwTable::construct(meta);
         let mpt_table = MptTable::construct(meta);
         let challenges = Challenges::construct(meta);

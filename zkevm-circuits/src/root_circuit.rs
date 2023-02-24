@@ -109,7 +109,7 @@ impl<'a, M: MultiMillerLoop> Circuit<M::Scalar> for RootCircuit<'a, M> {
         }
     }
 
-    fn configure(meta: &mut ConstraintSystem<M::Scalar>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<M::Scalar>) -> Self::Config {
         AggregationConfig::configure::<M::G1Affine>(meta)
     }
 

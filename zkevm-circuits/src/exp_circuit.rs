@@ -538,7 +538,7 @@ impl<F: Field> Circuit<F> for ExpCircuit<F> {
         Self::default()
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         let exp_table = ExpTable::construct(meta);
         let challenges = Challenges::construct(meta);
         (ExpCircuitConfig::new(meta, exp_table), challenges)
