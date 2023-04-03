@@ -21,6 +21,7 @@ use halo2_proofs::{
     },
 };
 use keccak256::EMPTY_HASH_LE;
+use std::collections::HashMap;
 
 use super::{rlc, CachedRegion, CellType, StoredExpression};
 
@@ -28,7 +29,7 @@ use super::{rlc, CachedRegion, CellType, StoredExpression};
 // It aims to cap `extended_k` to 2, which allows constraint degree to 2^2+1,
 // but each ExecutionGadget has implicit selector degree 3, so here it only
 // allows 2^2+1-3 = 2.
-const MAX_DEGREE: usize = 5;
+const MAX_DEGREE: usize = 32;
 const IMPLICIT_DEGREE: usize = 3;
 
 pub(crate) enum Transition<T> {
@@ -227,6 +228,25 @@ impl<F: Field> BaseConstraintBuilder<F> {
         }
     }
 
+    pub(crate) fn gate_query_names(
+        &self,
+        selector: Expression<F>,
+    ) -> (
+        Vec<(&'static str, Expression<F>)>,
+        HashMap<Expression<F>, String>,
+    ) {
+        unimplemented!()
+        // self.constraints
+        //     .clone()
+        //     .into_iter()
+        //     .map(|(name, constraint)| (name, selector.clone() * constraint))
+        //     .filter(|(name, constraint)| {
+        //         self.validate_degree(constraint.degree(), name);
+        //         true
+        //     })
+        //     .collect()
+    }
+
     pub(crate) fn gate(&self, selector: Expression<F>) -> Vec<(&'static str, Expression<F>)> {
         self.constraints
             .clone()
@@ -261,7 +281,7 @@ pub(crate) struct Constraints<F> {
     pub(crate) not_step_last: Vec<(&'static str, Expression<F>)>,
 }
 
-pub(crate) struct ConstraintBuilder<'a, F> {
+pub struct ConstraintBuilder<'a, F> {
     pub max_degree: usize,
     pub(crate) curr: Step<F>,
     pub(crate) next: Step<F>,
@@ -276,6 +296,7 @@ pub(crate) struct ConstraintBuilder<'a, F> {
     condition: Option<Expression<F>>,
     constraints_location: ConstraintLocation,
     stored_expressions: Vec<StoredExpression<F>>,
+    pub query_names: HashMap<Expression<F>, String>,
 }
 
 impl<'a, F: Field> ConstraintBuilder<'a, F> {
@@ -305,6 +326,7 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
             condition: None,
             constraints_location: ConstraintLocation::Step,
             stored_expressions: Vec::new(),
+            query_names: HashMap::new(),
         }
     }
 
@@ -326,6 +348,36 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
                 not_step_last: mul_exec_state_sel(self.constraints.not_step_last),
             },
             self.stored_expressions,
+            self.curr.cell_manager.get_height(),
+        )
+    }
+
+    /// Returns (list of constraints, list of first step constraints, stored
+    /// expressions, height used).
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn build_query_names(
+        self,
+    ) -> (
+        Constraints<F>,
+        Vec<StoredExpression<F>>,
+        (Expression<F>, HashMap<Expression<F>, String>),
+        usize,
+    ) {
+        let exec_state_sel = self.curr.execution_state_selector([self.execution_state]);
+        let mul_exec_state_sel = |c: Vec<(&'static str, Expression<F>)>| {
+            c.into_iter()
+                .map(|(name, constraint)| (name, exec_state_sel.clone() * constraint))
+                .collect()
+        };
+        (
+            Constraints {
+                step: mul_exec_state_sel(self.constraints.step),
+                step_first: mul_exec_state_sel(self.constraints.step_first),
+                step_last: mul_exec_state_sel(self.constraints.step_last),
+                not_step_last: mul_exec_state_sel(self.constraints.not_step_last),
+            },
+            self.stored_expressions,
+            (exec_state_sel.clone(), self.query_names),
             self.curr.cell_manager.get_height(),
         )
     }
@@ -376,6 +428,13 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
         RandomLinearCombination::<F, N>::new(self.query_bytes(), self.challenges.evm_word())
     }
 
+    pub(crate) fn query_word_rlc_n<const N: usize>(
+        &mut self,
+        name: &str,
+    ) -> RandomLinearCombination<F, N> {
+        RandomLinearCombination::<F, N>::new(self.query_bytes_n(name), self.challenges.evm_word())
+    }
+
     pub(crate) fn query_keccak_rlc<const N: usize>(&mut self) -> RandomLinearCombination<F, N> {
         RandomLinearCombination::<F, N>::new(self.query_bytes(), self.challenges.keccak_input())
     }
@@ -384,12 +443,24 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
         self.query_bytes_dyn(N).try_into().unwrap()
     }
 
+    pub(crate) fn query_bytes_n<const N: usize>(&mut self, name: &str) -> [Cell<F>; N] {
+        self.query_bytes_dyn_n(N, name).try_into().unwrap()
+    }
+
     pub(crate) fn query_bytes_dyn(&mut self, count: usize) -> Vec<Cell<F>> {
         self.query_cells(CellType::LookupByte, count)
     }
 
+    pub(crate) fn query_bytes_dyn_n(&mut self, count: usize, name: &str) -> Vec<Cell<F>> {
+        self.query_cells_n(CellType::LookupByte, count, name)
+    }
+
     pub(crate) fn query_cell(&mut self) -> Cell<F> {
         self.query_cell_with_type(CellType::StoragePhase1)
+    }
+
+    pub(crate) fn query_cell_n(&mut self, name: &str) -> Cell<F> {
+        self.query_cell_with_type_n(CellType::StoragePhase1, name)
     }
 
     pub(crate) fn query_cell_phase2(&mut self) -> Cell<F> {
@@ -402,6 +473,13 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
 
     pub(crate) fn query_cell_with_type(&mut self, cell_type: CellType) -> Cell<F> {
         self.query_cells(cell_type, 1).first().unwrap().clone()
+    }
+
+    pub(crate) fn query_cell_with_type_n(&mut self, cell_type: CellType, name: &str) -> Cell<F> {
+        self.query_cells_n(cell_type, 1, name)
+            .first()
+            .unwrap()
+            .clone()
     }
 
     pub(crate) fn query_bool_with_type(&mut self, cell_type: CellType) -> Cell<F> {
@@ -418,6 +496,28 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
         }
         .cell_manager
         .query_cells(cell_type, count)
+    }
+
+    fn query_cells_n(&mut self, cell_type: CellType, count: usize, name: &str) -> Vec<Cell<F>> {
+        let cells = if self.in_next_step {
+            &mut self.next
+        } else {
+            &mut self.curr
+        }
+        .cell_manager
+        .query_cells(cell_type, count);
+        // Store cell names
+        for (i, cell) in cells.iter().enumerate() {
+            let query_name = if count == 1 {
+                format!("{}", name)
+            } else if count < 10 {
+                format!("{}{:01}", name, i)
+            } else {
+                format!("{}{:02}", name, i)
+            };
+            self.query_names.insert(cell.expr(), query_name);
+        }
+        cells
     }
 
     pub(crate) fn word_rlc<const N: usize>(&self, bytes: [Expression<F>; N]) -> Expression<F> {
@@ -1330,11 +1430,11 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
         // will be multiplied by state selector and q_step/q_step_first
         // selector.
         debug_assert!(
-            degree <= MAX_DEGREE - IMPLICIT_DEGREE,
+            degree <= self.max_degree - IMPLICIT_DEGREE,
             "Expression {} degree too high: {} > {}",
             name,
             degree,
-            MAX_DEGREE - IMPLICIT_DEGREE,
+            self.max_degree - IMPLICIT_DEGREE,
         );
     }
 
@@ -1391,7 +1491,7 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
         let constraint = self.split_expression(
             name,
             constraint * self.condition_expr(),
-            MAX_DEGREE - IMPLICIT_DEGREE,
+            self.max_degree - IMPLICIT_DEGREE,
         );
 
         self.validate_degree(constraint.degree(), name);
@@ -1447,7 +1547,7 @@ impl<'a, F: Field> ConstraintBuilder<'a, F> {
         let compressed_expr = self.split_expression(
             "Lookup compression",
             rlc::expr(&lookup.input_exprs(), self.challenges.lookup_input()),
-            MAX_DEGREE - IMPLICIT_DEGREE,
+            self.max_degree - IMPLICIT_DEGREE,
         );
         self.store_expression(name, compressed_expr, CellType::Lookup(lookup.table()));
     }

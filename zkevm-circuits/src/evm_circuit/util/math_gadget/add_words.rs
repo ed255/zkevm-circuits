@@ -11,7 +11,7 @@ use halo2_proofs::{circuit::Value, plonk::Error};
 /// Construction of 2 256-bit words addition and result, which is useful for
 /// opcode ADD, SUB and balance operation
 #[derive(Clone, Debug)]
-pub(crate) struct AddWordsGadget<F, const N_ADDENDS: usize, const CHECK_OVERFLOW: bool> {
+pub struct AddWordsGadget<F, const N_ADDENDS: usize, const CHECK_OVERFLOW: bool> {
     addends: [util::Word<F>; N_ADDENDS],
     sum: util::Word<F>,
     carry_lo: Cell<F>,
@@ -26,11 +26,11 @@ impl<F: Field, const N_ADDENDS: usize, const CHECK_OVERFLOW: bool>
         addends: [util::Word<F>; N_ADDENDS],
         sum: util::Word<F>,
     ) -> Self {
-        let carry_lo = cb.query_cell();
+        let carry_lo = cb.query_cell_n("carryLo");
         let carry_hi = if CHECK_OVERFLOW {
             None
         } else {
-            Some(cb.query_cell())
+            Some(cb.query_cell_n("carry_hi"))
         };
 
         let addends_lo = &addends
@@ -145,17 +145,16 @@ impl<F: Field, const N_ADDENDS: usize, const CHECK_OVERFLOW: bool>
     }
 }
 
-#[cfg(test)]
-mod tests {
+#[cfg(any(feature = "test", test))]
+pub mod tests {
     use super::super::test_util::*;
     use super::*;
-    use eth_types::{Word, U256};
-    use halo2_proofs::halo2curves::bn256::Fr;
+    use eth_types::Word;
     use halo2_proofs::plonk::Error;
 
     #[derive(Clone)]
     /// AddWordsTestContainer: require(sum = sum(addends))
-    struct AddWordsTestContainer<
+    pub struct AddWordsTestContainer<
         F,
         const N_ADDENDS: usize,
         const CARRY_HI: u64,
@@ -166,12 +165,16 @@ mod tests {
         sum: util::Word<F>,
     }
 
+    const ABC: [char; 17] = [
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q',
+    ];
+
     impl<F: Field, const N_ADDENDS: usize, const CARRY_HI: u64, const CHECK_OVERFLOW: bool>
         MathGadgetContainer<F> for AddWordsTestContainer<F, N_ADDENDS, CARRY_HI, CHECK_OVERFLOW>
     {
         fn configure_gadget_container(cb: &mut ConstraintBuilder<F>) -> Self {
-            let addends = [(); N_ADDENDS].map(|_| cb.query_word_rlc());
-            let sum = cb.query_word_rlc();
+            let addends = core::array::from_fn(|i| cb.query_word_rlc_n(&format!("{}.b", ABC[i])));
+            let sum = cb.query_word_rlc_n("r.b");
             let addwords_gadget = AddWordsGadget::<F, N_ADDENDS, CHECK_OVERFLOW>::construct(
                 cb,
                 addends.clone(),

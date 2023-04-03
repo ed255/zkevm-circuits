@@ -23,7 +23,8 @@ use std::hash::{Hash, Hasher};
 pub(crate) mod common_gadget;
 pub(crate) mod constraint_builder;
 pub(crate) mod instrumentation;
-pub(crate) mod math_gadget;
+#[cfg(any(feature = "test", test))]
+pub mod math_gadget;
 pub(crate) mod memory_gadget;
 
 pub use gadgets::util::{and, not, or, select, sum};

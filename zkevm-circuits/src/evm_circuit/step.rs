@@ -14,6 +14,7 @@ use halo2_proofs::{
     circuit::Value,
     plonk::{Advice, Column, ConstraintSystem, Error, Expression},
 };
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::iter;
 use strum::IntoEnumIterator;
@@ -514,29 +515,50 @@ impl<F: FieldExt> Step<F> {
             MAX_STEP_HEIGHT // Query the entire current step.
         };
         let mut cell_manager = CellManager::new(meta, height, &advices, offset);
-        let state = {
-            StepState {
-                execution_state: DynamicSelectorHalf::new(
-                    &mut cell_manager,
-                    ExecutionState::amount(),
-                ),
-                rw_counter: cell_manager.query_cell(CellType::StoragePhase1),
-                call_id: cell_manager.query_cell(CellType::StoragePhase1),
-                is_root: cell_manager.query_cell(CellType::StoragePhase1),
-                is_create: cell_manager.query_cell(CellType::StoragePhase1),
-                code_hash: cell_manager.query_cell(CellType::StoragePhase2),
-                program_counter: cell_manager.query_cell(CellType::StoragePhase1),
-                stack_pointer: cell_manager.query_cell(CellType::StoragePhase1),
-                gas_left: cell_manager.query_cell(CellType::StoragePhase1),
-                memory_word_size: cell_manager.query_cell(CellType::StoragePhase1),
-                reversible_write_counter: cell_manager.query_cell(CellType::StoragePhase1),
-                log_id: cell_manager.query_cell(CellType::StoragePhase1),
-            }
+        let state = StepState {
+            execution_state: DynamicSelectorHalf::new(&mut cell_manager, ExecutionState::amount()),
+            rw_counter: cell_manager.query_cell(CellType::StoragePhase1),
+            call_id: cell_manager.query_cell(CellType::StoragePhase1),
+            is_root: cell_manager.query_cell(CellType::StoragePhase1),
+            is_create: cell_manager.query_cell(CellType::StoragePhase1),
+            code_hash: cell_manager.query_cell(CellType::StoragePhase2),
+            program_counter: cell_manager.query_cell(CellType::StoragePhase1),
+            stack_pointer: cell_manager.query_cell(CellType::StoragePhase1),
+            gas_left: cell_manager.query_cell(CellType::StoragePhase1),
+            memory_word_size: cell_manager.query_cell(CellType::StoragePhase1),
+            reversible_write_counter: cell_manager.query_cell(CellType::StoragePhase1),
+            log_id: cell_manager.query_cell(CellType::StoragePhase1),
         };
         Self {
             state,
             cell_manager,
         }
+    }
+
+    pub fn query_names(&self) -> HashMap<Expression<F>, String> {
+        let mut query_names = HashMap::new();
+        query_names.insert(self.state.rw_counter.expr(), "rwc".to_string());
+        query_names.insert(self.state.call_id.expr(), "callId".to_string());
+        query_names.insert(self.state.is_root.expr(), "isRoot".to_string());
+        query_names.insert(self.state.is_create.expr(), "isCreate".to_string());
+        query_names.insert(self.state.code_hash.expr(), "codeHash".to_string());
+        query_names.insert(self.state.program_counter.expr(), "pc".to_string());
+        query_names.insert(self.state.stack_pointer.expr(), "sp".to_string());
+        query_names.insert(self.state.gas_left.expr(), "gasLeft".to_string());
+        query_names.insert(self.state.memory_word_size.expr(), "memWSize".to_string());
+        query_names.insert(
+            self.state.reversible_write_counter.expr(),
+            "revRwc".to_string(),
+        );
+        query_names.insert(self.state.log_id.expr(), "logId".to_string());
+        query_names.insert(
+            self.state.execution_state.target_odd.expr(),
+            "sOdd".to_string(),
+        );
+        for (i, pair) in self.state.execution_state.target_pairs.iter().enumerate() {
+            query_names.insert(pair.expr(), format!("sPa{:02}", i));
+        }
+        query_names
     }
 
     pub(crate) fn execution_state_selector(

@@ -6,13 +6,13 @@ use halo2_proofs::plonk::{Circuit, ConstraintSystem};
 use std::collections::HashMap;
 
 // Step dimension
-pub(crate) const STEP_WIDTH: usize = 128;
+pub(crate) const STEP_WIDTH: usize = 27;
 /// Step height
-pub const MAX_STEP_HEIGHT: usize = 21;
+pub const MAX_STEP_HEIGHT: usize = 16;
 /// The height of the state of a step, used by gates that connect two
 /// consecutive steps. We target 1, which is also convenient for padding with
 /// EndBlock steps.
-pub(crate) const STEP_STATE_HEIGHT: usize = 1;
+pub(crate) const STEP_STATE_HEIGHT: usize = 4;
 
 /// Number of Advice Phase2 columns in the EVM circuit
 pub(crate) const N_PHASE2_COLUMNS: usize = 3;
@@ -22,9 +22,9 @@ pub(crate) const N_PHASE1_COLUMNS: usize =
     STEP_WIDTH - EVM_LOOKUP_COLS - N_PHASE2_COLUMNS - N_COPY_COLUMNS - N_BYTE_LOOKUPS;
 
 // Number of copy columns
-pub(crate) const N_COPY_COLUMNS: usize = 2;
+pub(crate) const N_COPY_COLUMNS: usize = 0;
 
-pub(crate) const N_BYTE_LOOKUPS: usize = 24;
+pub(crate) const N_BYTE_LOOKUPS: usize = 8;
 
 /// Amount of lookup columns in the EVM circuit dedicated to lookups.
 pub(crate) const EVM_LOOKUP_COLS: usize = FIXED_TABLE_LOOKUPS
@@ -49,28 +49,28 @@ pub(crate) const LOOKUP_CONFIG: &[(Table, usize)] = &[
 ];
 
 /// Fixed Table lookups done in EVMCircuit
-pub const FIXED_TABLE_LOOKUPS: usize = 8;
+pub const FIXED_TABLE_LOOKUPS: usize = 2;
 
 /// Tx Table lookups done in EVMCircuit
-pub const TX_TABLE_LOOKUPS: usize = 4;
+pub const TX_TABLE_LOOKUPS: usize = 0;
 
 /// Rw Table lookups done in EVMCircuit
-pub const RW_TABLE_LOOKUPS: usize = 8;
+pub const RW_TABLE_LOOKUPS: usize = 0;
 
 /// Bytecode Table lookups done in EVMCircuit
-pub const BYTECODE_TABLE_LOOKUPS: usize = 4;
+pub const BYTECODE_TABLE_LOOKUPS: usize = 0;
 
 /// Block Table lookups done in EVMCircuit
-pub const BLOCK_TABLE_LOOKUPS: usize = 1;
+pub const BLOCK_TABLE_LOOKUPS: usize = 0;
 
 /// Copy Table lookups done in EVMCircuit
-pub const COPY_TABLE_LOOKUPS: usize = 1;
+pub const COPY_TABLE_LOOKUPS: usize = 0;
 
 /// Keccak Table lookups done in EVMCircuit
-pub const KECCAK_TABLE_LOOKUPS: usize = 1;
+pub const KECCAK_TABLE_LOOKUPS: usize = 0;
 
 /// Exp Table lookups done in EVMCircuit
-pub const EXP_TABLE_LOOKUPS: usize = 1;
+pub const EXP_TABLE_LOOKUPS: usize = 0;
 
 /// Maximum number of bytes that an integer can fit in field without wrapping
 /// around.

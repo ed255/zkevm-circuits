@@ -3,7 +3,8 @@ use eth_types::Field;
 use halo2_proofs::plonk::Expression;
 
 mod abs_word;
-mod add_words;
+#[cfg(any(feature = "test", test))]
+pub mod add_words;
 mod batched_is_zero;
 mod binary_number;
 mod byte_size;
@@ -22,11 +23,12 @@ mod mul_word_u64;
 mod pair_select;
 mod range_check;
 mod rlp;
-#[cfg(test)]
-mod test_util;
+#[cfg(any(feature = "test", test))]
+pub mod test_util;
 
 pub(crate) use abs_word::AbsWordGadget;
-pub(crate) use add_words::AddWordsGadget;
+#[cfg(any(feature = "test", test))]
+pub use add_words::AddWordsGadget;
 pub(crate) use byte_size::ByteSizeGadget;
 pub(crate) use cmp_words::CmpWordsGadget;
 pub(crate) use comparison::ComparisonGadget;

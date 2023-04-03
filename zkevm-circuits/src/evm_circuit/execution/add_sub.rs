@@ -35,9 +35,9 @@ impl<F: Field> ExecutionGadget<F> for AddSubGadget<F> {
     fn configure(cb: &mut ConstraintBuilder<F>) -> Self {
         let opcode = cb.query_cell();
 
-        let a = cb.query_word_rlc();
-        let b = cb.query_word_rlc();
-        let c = cb.query_word_rlc();
+        let a = cb.query_word_rlc_n("a");
+        let b = cb.query_word_rlc_n("b");
+        let c = cb.query_word_rlc_n("c");
         let add_words = AddWordsGadget::construct(cb, [a.clone(), b.clone()], c.clone());
 
         // Swap a and c if opcode is SUB

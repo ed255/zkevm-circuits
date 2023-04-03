@@ -5,7 +5,12 @@ use strum::IntoEnumIterator;
 use crate::table::LookupTable;
 use crate::{
     evm_circuit::{
-        param::{MAX_STEP_HEIGHT, N_PHASE2_COLUMNS, STEP_WIDTH},
+        param::{
+            BLOCK_TABLE_LOOKUPS, BYTECODE_TABLE_LOOKUPS, COPY_TABLE_LOOKUPS, EVM_LOOKUP_COLS,
+            EXP_TABLE_LOOKUPS, FIXED_TABLE_LOOKUPS, KECCAK_TABLE_LOOKUPS, MAX_STEP_HEIGHT,
+            N_BYTE_LOOKUPS, N_COPY_COLUMNS, N_PHASE1_COLUMNS, N_PHASE2_COLUMNS, RW_TABLE_LOOKUPS,
+            STEP_WIDTH, TX_TABLE_LOOKUPS,
+        },
         step::{ExecutionState, Step},
         table::{FixedTableTag, Table},
         util::{
@@ -17,7 +22,7 @@ use crate::{
     util::Challenges,
 };
 use eth_types::{Field, Word, U256};
-pub(crate) use halo2_proofs::circuit::{Layouter, Value};
+pub(crate) use halo2_proofs::circuit::{Layouter, Region, Value};
 use halo2_proofs::plonk::{FirstPhase, SecondPhase, ThirdPhase};
 use halo2_proofs::{
     circuit::SimpleFloorPlanner,
@@ -43,7 +48,7 @@ pub(crate) fn generate_power_of_randomness<F: Field>(randomness: F) -> Vec<F> {
     (1..32).map(|exp| randomness.pow(&[exp, 0, 0, 0])).collect()
 }
 
-pub(crate) trait MathGadgetContainer<F: Field>: Clone {
+pub trait MathGadgetContainer<F: Field>: Clone {
     fn configure_gadget_container(cb: &mut ConstraintBuilder<F>) -> Self
     where
         Self: Sized;
@@ -56,12 +61,13 @@ pub(crate) trait MathGadgetContainer<F: Field>: Clone {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct UnitTestMathGadgetBaseCircuitConfig<F: Field, G>
+pub struct UnitTestMathGadgetBaseCircuitConfig<F: Field, G>
 where
     G: MathGadgetContainer<F>,
 {
     q_usable: Selector,
     fixed_table: [Column<Fixed>; 4],
+    byte_table: [Column<Fixed>; 1],
     advices: [Column<Advice>; STEP_WIDTH],
     step: Step<F>,
     stored_expressions: Vec<StoredExpression<F>>,
@@ -70,14 +76,48 @@ where
     challenges: Challenges<Expression<F>>,
 }
 
-pub(crate) struct UnitTestMathGadgetBaseCircuit<G> {
+impl<F: Field, G> UnitTestMathGadgetBaseCircuitConfig<F, G>
+where
+    G: MathGadgetContainer<F>,
+{
+    fn annotate_circuit(&self, region: &mut Region<F>) {
+        let groups = [
+            ("lf", FIXED_TABLE_LOOKUPS),
+            ("ltx", TX_TABLE_LOOKUPS),
+            ("lrw", RW_TABLE_LOOKUPS),
+            ("lby", BYTECODE_TABLE_LOOKUPS),
+            ("lbl", BLOCK_TABLE_LOOKUPS),
+            ("lco", COPY_TABLE_LOOKUPS),
+            ("lke", KECCAK_TABLE_LOOKUPS),
+            ("lex", EXP_TABLE_LOOKUPS),
+            ("y", N_PHASE2_COLUMNS),
+            ("cp", N_COPY_COLUMNS),
+            ("b", N_BYTE_LOOKUPS),
+            ("x", N_PHASE1_COLUMNS),
+        ];
+        let groups: Vec<_> = groups.iter().filter(|(name, length)| *length > 0).collect();
+        let mut group_index = 0;
+        let mut index = 0;
+        for col in self.advices {
+            let (name, length) = groups[group_index];
+            region.name_column(|| format!("{}{}", name, index), col);
+            index += 1;
+            if index >= *length {
+                index = 0;
+                group_index += 1;
+            }
+        }
+    }
+}
+
+pub struct UnitTestMathGadgetBaseCircuit<G> {
     size: usize,
     witnesses: Vec<Word>,
     _marker: PhantomData<G>,
 }
 
 impl<G> UnitTestMathGadgetBaseCircuit<G> {
-    fn new(size: usize, witnesses: Vec<Word>) -> Self {
+    pub fn new(size: usize, witnesses: Vec<Word>) -> Self {
         UnitTestMathGadgetBaseCircuit {
             size,
             witnesses,
@@ -98,12 +138,14 @@ impl<F: Field, G: MathGadgetContainer<F>> Circuit<F> for UnitTestMathGadgetBaseC
         }
     }
 
-    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+    fn configure(&self, meta: &mut ConstraintSystem<F>) -> Self::Config {
         let challenges = Challenges::construct(meta);
         let challenges_exprs = challenges.exprs(meta);
 
         let q_usable = meta.selector();
         let fixed_table = [(); 4].map(|_| meta.fixed_column());
+        let byte_table = [(); 1].map(|_| meta.fixed_column());
+        meta.annotate_lookup_any_column(byte_table[0], || "u8");
 
         let lookup_column_count: usize = LOOKUP_CONFIG.iter().map(|(_, count)| *count).sum();
         let advices = [(); STEP_WIDTH]
@@ -131,12 +173,14 @@ impl<F: Field, G: MathGadgetContainer<F>> Circuit<F> for UnitTestMathGadgetBaseC
             ExecutionState::STOP,
         );
         let math_gadget_container = G::configure_gadget_container(&mut cb);
-        let (constraints, stored_expressions, _) = cb.build();
+        let (constraints, stored_expressions, query_names, _) = cb.build_query_names();
 
         if !constraints.step.is_empty() {
             let step_constraints = constraints.step;
             meta.create_gate("MathGadgetTestContainer", |meta| {
                 let q_usable = meta.query_selector(q_usable);
+                meta.push_query_names(q_usable.clone(), step_curr.query_names());
+                meta.push_query_names(query_names.0, query_names.1);
                 step_constraints
                     .into_iter()
                     .map(move |(name, constraint)| (name, q_usable.clone() * constraint))
@@ -157,12 +201,19 @@ impl<F: Field, G: MathGadgetContainer<F>> Circuit<F> for UnitTestMathGadgetBaseC
                     });
                 }
             }
+            if let CellType::LookupByte = column.cell_type {
+                meta.lookup_any("Byte lookup", |meta| {
+                    let byte_table_expression = byte_table.table_exprs(meta)[0].clone();
+                    vec![(column.expr(), byte_table_expression)]
+                });
+            }
         }
 
         (
             UnitTestMathGadgetBaseCircuitConfig::<F, G> {
                 q_usable,
                 fixed_table,
+                byte_table,
                 advices,
                 step: step_curr,
                 stored_expressions,
@@ -184,6 +235,7 @@ impl<F: Field, G: MathGadgetContainer<F>> Circuit<F> for UnitTestMathGadgetBaseC
         layouter.assign_region(
             || "assign test container",
             |mut region| {
+                config.annotate_circuit(&mut region);
                 let offset = 0;
                 config.q_usable.enable(&mut region, offset)?;
                 let cached_region = &mut CachedRegion::<'_, '_, F>::new(
@@ -240,6 +292,23 @@ impl<F: Field, G: MathGadgetContainer<F>> Circuit<F> for UnitTestMathGadgetBaseC
 
                 Ok(())
             },
+        )?;
+
+        // Load byte table
+        layouter.assign_region(
+            || "byte table",
+            |mut region| {
+                for offset in 0..256 {
+                    region.assign_fixed(
+                        || "",
+                        config.byte_table[0],
+                        offset,
+                        || Value::known(F::from(offset as u64)),
+                    )?;
+                }
+
+                Ok(())
+            },
         )
     }
 }
@@ -264,6 +333,7 @@ pub(crate) fn test_math_gadget_container<F: Field, G: MathGadgetContainer<F>>(
 }
 
 /// A simple macro for less code & better readability
+#[cfg(test)]
 macro_rules! try_test {
     ($base_class:ty, $witnesses:expr, $expect_success:expr $(,)?) => {{
         test_math_gadget_container::<Fr, $base_class>($witnesses.to_vec(), $expect_success)
