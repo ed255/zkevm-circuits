@@ -10,7 +10,7 @@ mod execution;
 pub mod param;
 pub(crate) mod step;
 pub mod table;
-pub(crate) mod util;
+pub mod util;
 
 #[cfg(any(feature = "test", test))]
 pub(crate) mod test;

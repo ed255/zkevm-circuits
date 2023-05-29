@@ -44,7 +44,7 @@ pub(crate) fn generate_power_of_randomness<F: Field>(randomness: F) -> Vec<F> {
     (1..32).map(|exp| randomness.pow([exp, 0, 0, 0])).collect()
 }
 
-pub(crate) trait MathGadgetContainer<F: Field>: Clone {
+pub trait MathGadgetContainer<F: Field>: Clone {
     fn configure_gadget_container(cb: &mut EVMConstraintBuilder<F>) -> Self
     where
         Self: Sized;
@@ -57,7 +57,7 @@ pub(crate) trait MathGadgetContainer<F: Field>: Clone {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct UnitTestMathGadgetBaseCircuitConfig<F: Field, G>
+pub struct UnitTestMathGadgetBaseCircuitConfig<F: Field, G>
 where
     G: MathGadgetContainer<F>,
 {
@@ -71,14 +71,14 @@ where
     challenges: Challenges<Expression<F>>,
 }
 
-pub(crate) struct UnitTestMathGadgetBaseCircuit<G> {
+pub struct UnitTestMathGadgetBaseCircuit<G> {
     size: usize,
     witnesses: Vec<Word>,
     _marker: PhantomData<G>,
 }
 
 impl<G> UnitTestMathGadgetBaseCircuit<G> {
-    fn new(size: usize, witnesses: Vec<Word>) -> Self {
+    pub fn new(size: usize, witnesses: Vec<Word>) -> Self {
         UnitTestMathGadgetBaseCircuit {
             size,
             witnesses,

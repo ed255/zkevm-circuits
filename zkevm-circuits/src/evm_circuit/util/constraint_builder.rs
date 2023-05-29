@@ -264,7 +264,7 @@ pub(crate) struct Constraints<F> {
     pub(crate) not_step_last: Vec<(&'static str, Expression<F>)>,
 }
 
-pub(crate) struct EVMConstraintBuilder<'a, F> {
+pub struct EVMConstraintBuilder<'a, F> {
     pub max_degree: usize,
     pub(crate) curr: Step<F>,
     pub(crate) next: Step<F>,

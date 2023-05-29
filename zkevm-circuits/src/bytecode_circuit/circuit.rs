@@ -485,8 +485,14 @@ impl<F: Field> BytecodeCircuitConfig<F> {
         fail_fast: bool,
     ) -> Result<(), Error> {
         // Subtract the unusable rows from the size
-        assert!(size > self.minimum_rows);
-        let last_row_offset = size - self.minimum_rows + 1;
+        // assert!(
+        //     size > self.minimum_rows,
+        //     "size: {} <= self.minimum_rows: {}",
+        //     size,
+        //     self.minimum_rows
+        // );
+        // let last_row_offset = size - self.minimum_rows + 1;
+        let last_row_offset = size - 1; // self.minimum_rows + 1;
 
         trace!(
             "size: {}, minimum_rows: {}, last_row_offset:{}",

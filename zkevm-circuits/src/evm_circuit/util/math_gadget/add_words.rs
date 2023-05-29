@@ -146,15 +146,15 @@ impl<F: Field, const N_ADDENDS: usize, const CHECK_OVERFLOW: bool>
     }
 }
 
-#[cfg(test)]
-mod tests {
+#[cfg(any(feature = "test", test))]
+pub mod tests {
     use super::{super::test_util::*, *};
     use eth_types::{Word, U256};
     use halo2_proofs::{halo2curves::bn256::Fr, plonk::Error};
 
     #[derive(Clone)]
     /// AddWordsTestContainer: require(sum = sum(addends))
-    struct AddWordsTestContainer<
+    pub struct AddWordsTestContainer<
         F,
         const N_ADDENDS: usize,
         const CARRY_HI: u64,
